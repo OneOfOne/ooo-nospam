@@ -1,16 +1,3 @@
-=== Plugin Name ===
-Contributors: oneofone
-Tags: comments, spam, antispam, anti-spam, spambot, bot, comment
-Requires at least: 3.0.1
-Tested up to: 3.9
-Stable tag: trunk
-License: Apache v2
-License URI: http://www.apache.org/licenses/LICENSE-2.0.html
-
-Extremely simple, 0 configuration and 0 user/admin-interaction anti-spam plugin.
-
-== Description ==
-
 This plugin plugin blocks spam in comments automatically, without requiring any end-user input or any javascript.
 
 In a way it's similar to webvitaly's [Anti-Spam](http://wordpress.org/plugins/anti-spam/) however this doesn't
@@ -47,15 +34,18 @@ Also note that the time calculations are per-form, so there's no false-positives
 
 Feel free to fork it and submit patches / fixes on [github](https://github.com/OneOfOne/ooo-nospam)
 
-== Installation ==
+### Installation ###
 
-1. Upload `ooo-nospam.php` to the `/wp-content/plugins/` directory
+1. Download from Wordpress's plugin [registery](https://wordpress.org/plugins/oneofones-nospam/) or clone this repo to your `wp-content/plugins` folder.
+
 2. Activate the plugin through the 'Plugins' menu in WordPress
+
 3. Watch `/wp-admin/edit-comments.php?comment_status=spam` to see it in action.
 
-== Frequently Asked Questions ==
 
-= Are there any configuration options? =
+## Frequently Asked Questions ##
+
+### Are there any configuration options? ###
 
 Well, yes and no, after a lot of testing I came to some sane defaults, if you really want to change them you can edit
  the plugin and change :
@@ -65,8 +55,3 @@ Well, yes and no, after a lot of testing I came to some sane defaults, if you re
     define('NOSPAM_LOG', true); // if set to false, it will dismiss the comment completely instead of saving it as spam.
 
 
-== Changelog ==
-
-= 0.4 =
-
-* First public release.
