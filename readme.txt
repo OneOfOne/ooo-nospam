@@ -3,7 +3,7 @@ Contributors: oneofone
 Tags: comments, spam, antispam, anti-spam, spambot, bot, comment
 Requires at least: 3.5.1
 Tested up to: 3.9
-Stable tag: v0.6
+Stable tag: trunk
 License: Apache v2
 License URI: http://www.apache.org/licenses/LICENSE-2.0.html
 

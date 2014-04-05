@@ -3,7 +3,7 @@
  * Plugin Name: OneOfOne's NoSpam
  * Plugin URI: http://limitlessfx.com/php/nospam-wp
  * Description: Simple transparent no-spam plugin
- * Version: 0.4
+ * Version: v0.6
  * Author: OneOfOne
  * Author URI: http://limitlessfx.com/
  * License: Apache-2
