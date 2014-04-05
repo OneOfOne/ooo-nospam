@@ -10,75 +10,178 @@
  */
 
 if ( !function_exists( 'add_action' ) ) {
-	echo 'You have been a bad bad human, your computer will explode in 5 seconds.';
-	exit;
+	die('Nope.');
 }
 session_start();
 
-define('NOSPAM_VERSION', 0.1);
+define('NOSPAM_VERSION', 0.6);
 define('NOSPAM_MIN_TIME', 10.0);
 define('NOSPAM_MAX_URLS', 3);
-define('NOSPAM_LOG', true);
+define('NOSPAM_AUTO_DELETE', false);
 
-function nospam_form_part() {
-	if(!is_user_logged_in()) {
-		$uid = sprintf('%f', microtime(true));
-		$_SESSION['NS_' . $uid] = true;
-		echo '
-		<input type="hidden" name="ns_uid" value="'. $uid .'" />
+class OneOfOneNoSpam {
+	static $FIELD_NAMES = array('email', 'name', 'job', 'url');
+	static $OPTION_GROUP = 'ooo-nospam';
+	private $options;
+
+	public function __construct() {
+		$this->options = get_option(self::$OPTION_GROUP);
+		if(is_admin()) {
+	        add_action('admin_menu', array($this, 'add_plugin_page'));
+			add_action('admin_init', array($this, 'admin_page_init'));
+		}
+
+		if(!is_user_logged_in()) {
+			add_action('comment_form', array($this, 'comment_form'));
+			add_action('preprocess_comment' , array($this, 'preprocess_comment'));
+			add_filter('pre_comment_approved', array($this, 'pre_comment_approved') , 100, 2 );
+		}
+	}
+
+	public function add_plugin_page() {
+		add_options_page('Settings Admin', 'OneOfOne\'s NoSpam', 'manage_options', 'ooo-nospam-admin',
+			array($this, 'create_admin_page'));
+	}
+
+	public function create_admin_page() {
+		?>
+		<div class="wrap">
+			<h2>OneOfOne's NoSpam v<?php echo NOSPAM_VERSION?>
+
+			<form method="post" action="options.php">
+				<?php
+				// This prints out all hidden setting fields
+				settings_fields(self::$OPTION_GROUP);
+				do_settings_sections('ooo-nospam-admin');
+				submit_button();
+				?>
+			</form>
+		</div>
+	<?php
+	}
+
+	public function admin_page_init() {
+		register_setting(
+			self::$OPTION_GROUP, // Option group
+			'ooo-nospam', // Option name
+			array($this, 'sanitize') // Sanitize
+		);
+
+		add_settings_section('ns_default_options', // ID
+			'Settings', // Title
+			null,
+			'ooo-nospam-admin' // Page
+		);
+
+		add_settings_field('auto_delete', 'Auto Delete?',
+			array($this, 'auto_delete_callback'), 'ooo-nospam-admin', 'ns_default_options');
+
+		add_settings_field('max_urls', 'Max URLs',
+			array($this,  'max_urls_callback'), 'ooo-nospam-admin', 'ns_default_options');
+
+		add_settings_field('min_time', 'Timeout (in seconds)',
+			array($this, 'timeout_callback'), 'ooo-nospam-admin', 'ns_default_options');
+
+		add_settings_field('reset', 'Reset plugin options?',
+			array($this, 'reset_options_callback'), 'ooo-nospam-admin', 'ns_default_options');
+	}
+
+	public function sanitize($input) {
+		if($input['reset']) {
+			$this->reset_options();
+			$input = array('auto_delete' => NOSPAM_AUTO_DELETE ? 'Y' : '');
+		}
+		$new_input = array();
+		$new_input['min_time'] = isset($input['min_time']) ? absint($input['min_time']) : NOSPAM_MIN_TIME;
+		$new_input['max_urls'] = isset($input['max_urls']) ? absint($input['max_urls']) : NOSPAM_MAX_URLS;
+		$new_input['auto_delete'] = $input['auto_delete'] === 'Y';
+		return $new_input;
+	}
+
+	public function timeout_callback() {
+		printf('<input id="min_time" name="ooo-nospam[min_time]" size="2" value="%s">
+		The minimum time spent on the page before commenting.', esc_attr($this->options['min_time']));
+	}
+
+	public function max_urls_callback() {
+		printf('<input id="max_urls" name="ooo-nospam[max_urls]" size="2" value="%s">
+		Maximum number of URLs in the comment to consider it spam', esc_attr($this->options['max_urls']));
+	}
+
+	public function auto_delete_callback() {
+		printf('<input type="checkbox" id="auto_delete" name="ooo-nospam[auto_delete]" value="Y"%s> Yes',
+			$this->options['auto_delete'] ? ' checked="checked"' : '');
+	}
+
+	public function reset_options_callback() {
+		printf('<input type="checkbox" id="reset" name="ooo-nospam[reset]" value="Y"%s> Yes', '');
+	}
+
+	public function comment_form() {
+			$cid = sprintf('%f', microtime(true));
+			$fn = self::$FIELD_NAMES[mt_rand(0, count(self::$FIELD_NAMES) - 1)] .'-' . substr($cid, -1);
+			$_SESSION['NS_' . $cid] = $fn;
+			echo '
 		<p style="position:absolute; left:-99999px">
-			<input type="text" name="email-' . substr(md5($uid), 0, 4) .'" size="30" value="-"/>
+			<input type="hidden" name="NS_CID" value="'. $cid .'" />
+			<input type="text" name="' . $fn  . '" size="30" value="-"/>
 		</p>
 		';
 
 	}
-}
-add_action( 'comment_form', 'nospam_form_part');
 
-function nospam_check_for_spam($data) {
-	$data['spam_score'] = 0;
-	if(!is_user_logged_in()) {
+	public function preprocess_comment($data) {
+		$data['spam_score'] = 0;
+
 		$type = $data['comment_type'];
-		$uid = isset($_POST['ns_uid']) ? $_POST['ns_uid'] : 0;
-		$femail = 'email-' . substr(md5($uid), 0, 4);
-		$dummy = array();
+		$cid = isset($_POST['NS_CID']) ? $_POST['NS_CID'] : 0;
+		$fn = isset($_SESSION['NS_' . $cid]) ? $_SESSION['NS_' . $cid] : '';
+		unset($_SESSION['NS_' . $cid]);
+
+		$dummy = array(); //workaround for older versions of php
 		$nurls = preg_match_all('@http(?:s)?://@', $data['comment_content'], $dummy);
-		$t = floatval($uid);
+
+		$time = microtime(true) - floatval($cid);
 
 		$checks = array(
 			'is-trackback' => $type === 'trackback' ? 1 : 0,
-			'no-session-token' => !isset($_SESSION['NS_' . $uid]) ? 1 : 0,
-			'fake-email-field' => (!isset($_POST[$femail]) ||  $_POST[$femail] !== '-') ? 1.0 : 0,
-			'number-of-urls' => ($nurls > NOSPAM_MAX_URLS) ? $nurls : 0,
+			'no-session-token' => !$fn ? 1 : 0,
+			'hidden-field' => (!isset($_POST[$fn]) ||  $_POST[$fn] !== '-') ? 1.0 : 0,
+			'number-of-urls' => ($nurls > $this->options['max_urls']) ? $nurls : 0,
 			'referer' => isset($_SERVER['HTTP_REFERER']) && strpos($_SERVER['HTTP_REFERER'],
 					get_site_url()) !== false ? 0 : 1,
-			'too-fast' => (microtime(true) - $t) < NOSPAM_MIN_TIME ? (microtime(true) - $t) : 0
+			'too-fast' => $time < $this->options['min_time'] ? $time : 0
 		);
-		unset($_SESSION['xNS_' . $uid]);
 		$score = 0;
 		foreach($checks as $k => $v) {
 			$score += $v;
 		}
+
 		if($score > 0) {
 			$data['comment_content'] .= "\n" . json_encode($checks);
 			$data['spam_score'] = $score;
 		}
-
+		return $data;
 	}
-	return $data;
-}
-add_action('preprocess_comment' , 'nospam_check_for_spam');
 
-function nospam_filter_comment($approved, $data) {
-	if(!is_user_logged_in()) {
+	public function pre_comment_approved($approved, $data) {
 		if ($data['spam_score'] > 0) {
-			if(NOSPAM_LOG) {
-				return 'spam';
+			if($this->options['auto_delete']) {
+				die('spam');
 			} else {
-				wp_die('You have been a bad bad human.', 'Denied', array('response' => 403));
+				return 'spam';
+
 			}
 		}
+		return $approved;
 	}
-	return $approved;
+
+	private function reset_options() {
+		delete_option(self::$OPTION_GROUP);
+	}
 }
-add_filter('pre_comment_approved', 'nospam_filter_comment' , 100, 2 );
+
+add_action( 'init', 'init_ooo_nospam');
+function init_ooo_nospam() {
+	return new OneOfOneNoSpam();
+}
