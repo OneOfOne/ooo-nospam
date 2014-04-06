@@ -62,9 +62,14 @@ As of version 0.6 you can access all configurable options in `/wp-admin/options-
 
 == Changelog ==
 
-= 0.6 =
+= v0.7 =
+* Fixed a bug where default settings weren't loaded at all.
+* Fixed the wording on the maximum number of urls allowed.
+* Added a counter of how many comments have been blocked.
+
+= v0.6 =
 * Rewrote it to use OOP.
 * Added configurable options in admin settings.
 
-= 0.4 =
+= v0.4 =
 * First public release.

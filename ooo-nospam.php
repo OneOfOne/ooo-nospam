@@ -30,7 +30,7 @@ class OneOfOneNoSpam {
 		$this->count = absint(get_option(self::$OPTION_COUNT));
 
 		if(is_admin()) {
-	        add_action('admin_menu', array($this, 'add_plugin_page'));
+			add_action('admin_menu', array($this, 'add_plugin_page'));
 			add_action('admin_init', array($this, 'admin_page_init'));
 		}
 
@@ -50,15 +50,15 @@ class OneOfOneNoSpam {
 		?>
 		<div class="wrap">
 			<h2>OneOfOne's NoSpam v<?php echo NOSPAM_VERSION?>
-			<h3>Spam comments blocked : <em><?php echo $this->count; ?></em></h3>
-			<form method="post" action="options.php">
-				<?php
-				// This prints out all hidden setting fields
-				settings_fields(self::$OPTION_GROUP);
-				do_settings_sections('ooo-nospam-admin');
-				submit_button();
-				?>
-			</form>
+				<h3>Spam comments blocked : <em><?php echo $this->count; ?></em></h3>
+				<form method="post" action="options.php">
+					<?php
+					// This prints out all hidden setting fields
+					settings_fields(self::$OPTION_GROUP);
+					do_settings_sections('ooo-nospam-admin');
+					submit_button();
+					?>
+				</form>
 		</div>
 	<?php
 	}
@@ -79,7 +79,7 @@ class OneOfOneNoSpam {
 		add_settings_field('auto_delete', 'Auto Delete?',
 			array($this, 'auto_delete_callback'), 'ooo-nospam-admin', 'ns_default_options');
 
-		add_settings_field('max_urls', 'Max URLs',
+		add_settings_field('max_urls', 'Allowed URLs',
 			array($this,  'max_urls_callback'), 'ooo-nospam-admin', 'ns_default_options');
 
 		add_settings_field('min_time', 'Timeout (in seconds)',
@@ -124,10 +124,10 @@ class OneOfOneNoSpam {
 	}
 
 	public function comment_form() {
-			$cid = sprintf('%f', microtime(true));
-			$fn = self::$FIELD_NAMES[mt_rand(0, count(self::$FIELD_NAMES) - 1)] .'-' . substr($cid, -3);
-			$_SESSION['NS_' . $cid] = $fn;
-			echo '
+		$cid = sprintf('%f', microtime(true));
+		$fn = self::$FIELD_NAMES[mt_rand(0, count(self::$FIELD_NAMES) - 1)] .'-' . substr($cid, -3);
+		$_SESSION['NS_' . $cid] = $fn;
+		echo '
 		<p style="position:absolute; left:-99999px">
 			<input type="hidden" name="NS_CID" value="'. $cid .'" />
 			<input type="text" name="' . $fn  . '" size="30" value="-"/>
