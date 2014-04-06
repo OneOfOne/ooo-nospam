@@ -1,9 +1,9 @@
 <?php
 /**
  * Plugin Name: OneOfOne's NoSpam
- * Plugin URI: http://limitlessfx.com/php/nospam-wp
+ * Plugin URI: http://limitlessfx.com/
  * Description: Simple transparent no-spam plugin
- * Version: v0.6
+ * Version: v0.7
  * Author: OneOfOne
  * Author URI: http://limitlessfx.com/
  * License: Apache-2
@@ -14,7 +14,7 @@ if ( !function_exists( 'add_action' ) ) {
 }
 session_start();
 
-define('NOSPAM_VERSION', 0.6);
+define('NOSPAM_VERSION', 0.7);
 define('NOSPAM_MIN_TIME', 10.0);
 define('NOSPAM_MAX_URLS', 3);
 define('NOSPAM_AUTO_DELETE', false);
@@ -22,10 +22,13 @@ define('NOSPAM_AUTO_DELETE', false);
 class OneOfOneNoSpam {
 	static $FIELD_NAMES = array('email', 'name', 'job', 'url');
 	static $OPTION_GROUP = 'ooo-nospam';
-	private $options;
+	static $OPTION_COUNT = 'ooo-nospam-count';
+	private $options, $count;
 
 	public function __construct() {
-		$this->options = get_option(self::$OPTION_GROUP);
+		$this->options = $this->sanitize(get_option(self::$OPTION_GROUP));
+		$this->count = absint(get_option(self::$OPTION_COUNT));
+
 		if(is_admin()) {
 	        add_action('admin_menu', array($this, 'add_plugin_page'));
 			add_action('admin_init', array($this, 'admin_page_init'));
@@ -47,7 +50,7 @@ class OneOfOneNoSpam {
 		?>
 		<div class="wrap">
 			<h2>OneOfOne's NoSpam v<?php echo NOSPAM_VERSION?>
-
+			<h3>Spam comments blocked : <em><?php echo $this->count; ?></em></h3>
 			<form method="post" action="options.php">
 				<?php
 				// This prints out all hidden setting fields
@@ -87,13 +90,16 @@ class OneOfOneNoSpam {
 	}
 
 	public function sanitize($input) {
-		if($input['reset']) {
+		if(isset($input['reset']) && $input['reset'] === 'Y') {
 			$this->reset_options();
-			$input = array('auto_delete' => NOSPAM_AUTO_DELETE ? 'Y' : '');
+			$input = array(
+				'min_time' => NOSPAM_MIN_TIME,
+				'max_urls' => NOSPAM_MAX_URLS,
+				'auto_delete' => NOSPAM_AUTO_DELETE ? 'Y' : 'N');
 		}
 		$new_input = array();
-		$new_input['min_time'] = isset($input['min_time']) ? absint($input['min_time']) : NOSPAM_MIN_TIME;
-		$new_input['max_urls'] = isset($input['max_urls']) ? absint($input['max_urls']) : NOSPAM_MAX_URLS;
+		$new_input['min_time'] = absint($input['min_time']) > 0 ? absint($input['min_time']) : NOSPAM_MIN_TIME;
+		$new_input['max_urls'] = absint($input['max_urls']) > 0 ? absint($input['max_urls']) : NOSPAM_MAX_URLS;
 		$new_input['auto_delete'] = $input['auto_delete'] === 'Y';
 		return $new_input;
 	}
@@ -105,7 +111,7 @@ class OneOfOneNoSpam {
 
 	public function max_urls_callback() {
 		printf('<input id="max_urls" name="ooo-nospam[max_urls]" size="2" value="%s">
-		Maximum number of URLs in the comment to consider it spam', esc_attr($this->options['max_urls']));
+		Maximum number of URLs allowed in a comment.', esc_attr($this->options['max_urls']));
 	}
 
 	public function auto_delete_callback() {
@@ -119,7 +125,7 @@ class OneOfOneNoSpam {
 
 	public function comment_form() {
 			$cid = sprintf('%f', microtime(true));
-			$fn = self::$FIELD_NAMES[mt_rand(0, count(self::$FIELD_NAMES) - 1)] .'-' . substr($cid, -1);
+			$fn = self::$FIELD_NAMES[mt_rand(0, count(self::$FIELD_NAMES) - 1)] .'-' . substr($cid, -3);
 			$_SESSION['NS_' . $cid] = $fn;
 			echo '
 		<p style="position:absolute; left:-99999px">
@@ -166,6 +172,8 @@ class OneOfOneNoSpam {
 
 	public function pre_comment_approved($approved, $data) {
 		if ($data['spam_score'] > 0) {
+			$this->count++;
+			update_option(self::$OPTION_COUNT, $this->count);
 			if($this->options['auto_delete']) {
 				die('spam');
 			} else {
