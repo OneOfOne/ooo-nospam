@@ -61,6 +61,9 @@ Feel free to fork it and submit patches / fixes on [github](https://github.com/O
 As of version 0.6 you can access all configurable options in `/wp-admin/options-general.php?page=ooo-nospam-admin`
 
 == Changelog ==
+= v0.7.5 =
+* Changed the number of possible names of the hidden field.
+* Set a higher priority on the preprocess_comment hook.
 
 = v0.7 =
 * Fixed a bug where default settings weren't loaded at all.

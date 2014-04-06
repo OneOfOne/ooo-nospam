@@ -3,7 +3,7 @@
  * Plugin Name: OneOfOne's NoSpam
  * Plugin URI: http://limitlessfx.com/
  * Description: Simple transparent no-spam plugin
- * Version: v0.7
+ * Version: v0.7.5
  * Author: OneOfOne
  * Author URI: http://limitlessfx.com/
  * License: Apache-2
@@ -20,7 +20,7 @@ define('NOSPAM_MAX_URLS', 3);
 define('NOSPAM_AUTO_DELETE', false);
 
 class OneOfOneNoSpam {
-	static $FIELD_NAMES = array('email', 'name', 'job', 'url');
+	static $FIELD_NAMES = array('email', 'url');
 	static $OPTION_GROUP = 'ooo-nospam';
 	static $OPTION_COUNT = 'ooo-nospam-count';
 	private $options, $count;
@@ -30,14 +30,14 @@ class OneOfOneNoSpam {
 		$this->count = absint(get_option(self::$OPTION_COUNT));
 
 		if(is_admin()) {
-			add_action('admin_menu', array($this, 'add_plugin_page'));
-			add_action('admin_init', array($this, 'admin_page_init'));
+			add_action('admin_menu', array(&$this, 'add_plugin_page'));
+			add_action('admin_init', array(&$this, 'admin_page_init'));
 		}
 
 		if(!is_user_logged_in()) {
-			add_action('comment_form', array($this, 'comment_form'));
-			add_action('preprocess_comment' , array($this, 'preprocess_comment'));
-			add_filter('pre_comment_approved', array($this, 'pre_comment_approved') , 100, 2 );
+			add_action('comment_form', array(&$this, 'comment_form'));
+			add_action('preprocess_comment' , array(&$this, 'preprocess_comment'), 100);
+			add_filter('pre_comment_approved', array(&$this, 'pre_comment_approved') , 100, 2 );
 		}
 	}
 
@@ -125,7 +125,7 @@ class OneOfOneNoSpam {
 
 	public function comment_form() {
 		$cid = sprintf('%f', microtime(true));
-		$fn = self::$FIELD_NAMES[mt_rand(0, count(self::$FIELD_NAMES) - 1)] .'-' . substr($cid, -3);
+		$fn = self::$FIELD_NAMES[mt_rand(0, count(self::$FIELD_NAMES) - 1)] .'-' . mt_rand(11, 99);
 		$_SESSION['NS_' . $cid] = $fn;
 		echo '
 		<p style="position:absolute; left:-99999px">
