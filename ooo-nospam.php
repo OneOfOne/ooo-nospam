@@ -3,7 +3,7 @@
  * Plugin Name: OneOfOne's NoSpam
  * Plugin URI: http://limitlessfx.com/
  * Description: Simple transparent no-spam plugin
- * Version: v0.7.5
+ * Version: v0.7.6
  * Author: OneOfOne
  * Author URI: http://limitlessfx.com/
  * License: Apache-2
@@ -100,7 +100,7 @@ class OneOfOneNoSpam {
 		$new_input = array();
 		$new_input['min_time'] = absint($input['min_time']) > 0 ? absint($input['min_time']) : NOSPAM_MIN_TIME;
 		$new_input['max_urls'] = absint($input['max_urls']) > 0 ? absint($input['max_urls']) : NOSPAM_MAX_URLS;
-		$new_input['auto_delete'] = $input['auto_delete'] === 'Y';
+		$new_input['auto_delete'] = $input['auto_delete'];
 		return $new_input;
 	}
 
@@ -174,7 +174,7 @@ class OneOfOneNoSpam {
 		if ($data['spam_score'] > 0) {
 			$this->count++;
 			update_option(self::$OPTION_COUNT, $this->count);
-			if($this->options['auto_delete']) {
+			if($this->options['auto_delete'] === 'Y') {
 				die('spam');
 			} else {
 				return 'spam';
