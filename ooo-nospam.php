@@ -3,7 +3,7 @@
  * Plugin Name: OneOfOne's NoSpam
  * Plugin URI: http://limitlessfx.com/
  * Description: Simple transparent no-spam plugin
- * Version: v0.7.6
+ * Version: v0.7.7
  * Author: OneOfOne
  * Author URI: http://limitlessfx.com/
  * License: Apache-2
@@ -14,13 +14,15 @@ if ( !function_exists( 'add_action' ) ) {
 }
 session_start();
 
-define('NOSPAM_VERSION', 0.7);
+define('NOSPAM_VERSION', '0.7.7');
 define('NOSPAM_MIN_TIME', 10.0);
 define('NOSPAM_MAX_URLS', 3);
 define('NOSPAM_AUTO_DELETE', false);
+define('NOSPAM_DEBUG', false);
+define('NOSPAM_JAVASCRIPT', false);
 
 class OneOfOneNoSpam {
-	static $FIELD_NAMES = array('email', 'url');
+	static $FIELD_NAMES = array('email');
 	static $OPTION_GROUP = 'ooo-nospam';
 	static $OPTION_COUNT = 'ooo-nospam-count';
 	private $options, $count;
@@ -55,6 +57,44 @@ class OneOfOneNoSpam {
 					<?php
 					// This prints out all hidden setting fields
 					settings_fields(self::$OPTION_GROUP);
+					?>
+					<table class="form-table">
+						<tr>
+							<th scope="row">Auto Delete?</th>
+							<td><?php echo $this->get_input_option('auto_delete', 2, 'checkbox'); ?> Yes
+							</td>
+						</tr>
+						<tr>
+							<th scope="row">Allowed URLs</th>
+							<td><?php echo $this->get_input_option('max_urls'); ?>
+								Maximum number of URLs allowed in a comment.
+							</td>
+						</tr>
+						<tr>
+							<th scope="row">Timeout (in seconds)</th>
+							<td><?php echo $this->get_input_option('min_time'); ?>
+								The minimum time spent on the page before commenting.
+							</td>
+						</tr>
+						<tr>
+							<th scope="row">Enable Javascript?</th>
+							<td><?php echo $this->get_input_option('javascript', 2, 'checkbox'); ?>
+								This will include an extra check using javascript.
+							</td>
+						</tr>
+						<tr>
+							<th scope="row">Enable Debugging?</th>
+							<td><?php echo $this->get_input_option('debug', 2, 'checkbox'); ?>
+								<small>This will embed debugging info in non-spam comments,
+									<b>only enable if spam is bypassing the plugin.</b></small>
+							</td>
+						</tr>
+						<tr>
+							<th scope="row">Reset plugin options?</th>
+							<td><?php echo $this->get_input_option('reset', 2, 'checkbox'); ?> Yes</td>
+						</tr>
+					</table>
+					<?php
 					do_settings_sections('ooo-nospam-admin');
 					submit_button();
 					?>
@@ -70,23 +110,6 @@ class OneOfOneNoSpam {
 			array($this, 'sanitize') // Sanitize
 		);
 
-		add_settings_section('ns_default_options', // ID
-			'Settings', // Title
-			null,
-			'ooo-nospam-admin' // Page
-		);
-
-		add_settings_field('auto_delete', 'Auto Delete?',
-			array($this, 'auto_delete_callback'), 'ooo-nospam-admin', 'ns_default_options');
-
-		add_settings_field('max_urls', 'Allowed URLs',
-			array($this,  'max_urls_callback'), 'ooo-nospam-admin', 'ns_default_options');
-
-		add_settings_field('min_time', 'Timeout (in seconds)',
-			array($this, 'timeout_callback'), 'ooo-nospam-admin', 'ns_default_options');
-
-		add_settings_field('reset', 'Reset plugin options?',
-			array($this, 'reset_options_callback'), 'ooo-nospam-admin', 'ns_default_options');
 	}
 
 	public function sanitize($input) {
@@ -95,32 +118,17 @@ class OneOfOneNoSpam {
 			$input = array(
 				'min_time' => NOSPAM_MIN_TIME,
 				'max_urls' => NOSPAM_MAX_URLS,
-				'auto_delete' => NOSPAM_AUTO_DELETE ? 'Y' : 'N');
+				'auto_delete' => NOSPAM_AUTO_DELETE ? 'Y' : '',
+				'javascript' => NOSPAM_JAVASCRIPT ? 'Y' : '',
+				'debug' => NOSPAM_DEBUG
+			);
 		}
-		$new_input = array();
-		$new_input['min_time'] = absint($input['min_time']) > 0 ? absint($input['min_time']) : NOSPAM_MIN_TIME;
-		$new_input['max_urls'] = absint($input['max_urls']) > 0 ? absint($input['max_urls']) : NOSPAM_MAX_URLS;
-		$new_input['auto_delete'] = $input['auto_delete'];
-		return $new_input;
-	}
-
-	public function timeout_callback() {
-		printf('<input id="min_time" name="ooo-nospam[min_time]" size="2" value="%s">
-		The minimum time spent on the page before commenting.', esc_attr($this->options['min_time']));
-	}
-
-	public function max_urls_callback() {
-		printf('<input id="max_urls" name="ooo-nospam[max_urls]" size="2" value="%s">
-		Maximum number of URLs allowed in a comment.', esc_attr($this->options['max_urls']));
-	}
-
-	public function auto_delete_callback() {
-		printf('<input type="checkbox" id="auto_delete" name="ooo-nospam[auto_delete]" value="Y"%s> Yes',
-			$this->options['auto_delete'] ? ' checked="checked"' : '');
-	}
-
-	public function reset_options_callback() {
-		printf('<input type="checkbox" id="reset" name="ooo-nospam[reset]" value="Y"%s> Yes', '');
+		$input['min_time'] = absint($input['min_time']) > 0 ? absint($input['min_time']) : NOSPAM_MIN_TIME;
+		$input['max_urls'] = absint($input['max_urls']) > 0 ? absint($input['max_urls']) : NOSPAM_MAX_URLS;
+		$input['javascript'] = isset($input['javascript']) ? $input['javascript'] : '';
+		$input['auto_delete'] = isset($input['auto_delete']) ? $input['auto_delete'] : '';
+		$input['debug'] = isset($input['debug']) ? $input['debug'] : '';
+		return $input;
 	}
 
 	public function comment_form() {
@@ -130,9 +138,12 @@ class OneOfOneNoSpam {
 		echo '
 		<p style="position:absolute; left:-99999px">
 			<input type="hidden" name="NS_CID" value="'. $cid .'" />
-			<input type="text" name="' . $fn  . '" size="30" value="-"/>
+			<input type="text" id="' . $fn . '" name="' . $fn  . '" size="30" value="-"/>
 		</p>
 		';
+		if($this->options['javascript'] === 'Y') {
+			echo '<script>(function(e){if(e)e.value="js";})(document.getElementById("' . $fn . '"))</script>';
+		}
 
 	}
 
@@ -158,6 +169,12 @@ class OneOfOneNoSpam {
 					get_site_url()) !== false ? 0 : 1,
 			'too-fast' => $time < $this->options['min_time'] ? $time : 0
 		);
+
+		if($this->options['javascript'] === 'Y') {
+			$checks['javascript'] = $_POST[$fn] !== 'js' ? 1 : 0;
+			$checks['hidden-field'] = $checks['javascript'];
+		}
+
 		$score = 0;
 		foreach($checks as $k => $v) {
 			$score += $v;
@@ -166,6 +183,8 @@ class OneOfOneNoSpam {
 		if($score > 0) {
 			$data['comment_content'] .= "\n" . json_encode($checks);
 			$data['spam_score'] = $score;
+		} elseif($this->options['debug'] == 'Y') {
+			$data['comment_content'] .= "\n<!-- nospam-debug : " . json_encode($checks) . '-->';
 		}
 		return $data;
 	}
@@ -187,9 +206,20 @@ class OneOfOneNoSpam {
 	private function reset_options() {
 		delete_option(self::$OPTION_GROUP);
 	}
+
+	private function get_input_option($name, $size = 2, $type = 'text') {
+		static $fmt_text = '<input id="%1$s" name="%2$s[%1$s]" size="%3$d" value="%4$s">';
+		static $fmt_checkbox = '<input type="checkbox" id="%1$s" name="%2$s[%1$s]" value="Y"%3$s>';
+		if($type === 'text') {
+			return sprintf($fmt_text, $name, self::$OPTION_GROUP, $size, esc_attr($this->options[$name]));
+		} else if($type === 'checkbox') {
+			return sprintf($fmt_checkbox, $name, self::$OPTION_GROUP,
+				isset($this->options[$name]) && $this->options[$name] === 'Y' ? ' checked="checked"' : '');
+		}
+	}
 }
 
-add_action( 'init', 'init_ooo_nospam');
+add_action('init', 'init_ooo_nospam');
 function init_ooo_nospam() {
 	return new OneOfOneNoSpam();
 }

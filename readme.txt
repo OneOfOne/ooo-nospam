@@ -61,6 +61,11 @@ Feel free to fork it and submit patches / fixes on [github](https://github.com/O
 As of version 0.6 you can access all configurable options in `/wp-admin/options-general.php?page=ooo-nospam-admin`
 
 == Changelog ==
+= v0.7.7 =
+* Added an option to use an extra check using javascript.
+* Added a debug option to embed the score array in comments that passes the plugin.
+* Changed the hidden field name, again.
+
 = v0.7.6 =
 * Fixed a bug with the auto delete option not showing in the user interface.
 
