@@ -3,6 +3,8 @@ This plugin plugin blocks spam in comments automatically, without requiring any 
 In a way it's similar to webvitaly's [Anti-Spam](http://wordpress.org/plugins/anti-spam/) however this doesn't
 require the user to enter anything at all.
 
+* As of version 0.7.7 there's an option to add an extra javascript check, it's off by default.
+
 The comment gets marked as spam if any of the following rules are true :
 
 * If the comment is a trackback.

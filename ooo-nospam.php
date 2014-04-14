@@ -3,7 +3,7 @@
  * Plugin Name: OneOfOne's NoSpam
  * Plugin URI: http://limitlessfx.com/
  * Description: Simple transparent no-spam plugin
- * Version: v0.7.7
+ * Version: v0.8
  * Author: OneOfOne
  * Author URI: http://limitlessfx.com/
  * License: Apache-2
@@ -14,7 +14,7 @@ if ( !function_exists( 'add_action' ) ) {
 }
 session_start();
 
-define('NOSPAM_VERSION', '0.7.7');
+define('NOSPAM_VERSION', '0.8');
 define('NOSPAM_MIN_TIME', 10.0);
 define('NOSPAM_MAX_URLS', 3);
 define('NOSPAM_AUTO_DELETE', false);
@@ -30,25 +30,29 @@ class OneOfOneNoSpam {
 	public function __construct() {
 		$this->options = $this->sanitize(get_option(self::$OPTION_GROUP));
 		$this->count = absint(get_option(self::$OPTION_COUNT));
-
+		if(!$this->count) {
+			update_option(self::$OPTION_COUNT, 0);
+		}
 		if(is_admin()) {
 			add_action('admin_menu', array(&$this, 'add_plugin_page'));
 			add_action('admin_init', array(&$this, 'admin_page_init'));
 		}
 
 		if(!is_user_logged_in()) {
+			//todo comments_array
 			add_action('comment_form', array(&$this, 'comment_form'));
-			add_action('preprocess_comment' , array(&$this, 'preprocess_comment'), 100);
-			add_filter('pre_comment_approved', array(&$this, 'pre_comment_approved') , 100, 2 );
+			add_action('preprocess_comment' , array(&$this, 'preprocess_comment'), 0);
+			add_filter('pre_comment_approved', array(&$this, 'pre_comment_approved') , 0, 2);
+			add_filter('comments_array', array(&$this, 'filter_comments_array') , 0);
 		}
 	}
 
 	public function add_plugin_page() {
 		add_options_page('Settings Admin', 'OneOfOne\'s NoSpam', 'manage_options', 'ooo-nospam-admin',
-			array($this, 'create_admin_page'));
+			array(&$this, 'print_admin_page'));
 	}
 
-	public function create_admin_page() {
+	public function print_admin_page() {
 		?>
 		<div class="wrap">
 			<h2>OneOfOne's NoSpam v<?php echo NOSPAM_VERSION?>
@@ -107,14 +111,14 @@ class OneOfOneNoSpam {
 		register_setting(
 			self::$OPTION_GROUP, // Option group
 			'ooo-nospam', // Option name
-			array($this, 'sanitize') // Sanitize
+			array(&$this, 'sanitize') // Sanitize
 		);
 
 	}
 
 	public function sanitize($input) {
 		if(isset($input['reset']) && $input['reset'] === 'Y') {
-			$this->reset_options();
+			delete_option(self::$OPTION_GROUP);
 			$input = array(
 				'min_time' => NOSPAM_MIN_TIME,
 				'max_urls' => NOSPAM_MAX_URLS,
@@ -142,14 +146,12 @@ class OneOfOneNoSpam {
 		</p>
 		';
 		if($this->options['javascript'] === 'Y') {
-			echo '<script>(function(e){if(e)e.value="js";})(document.getElementById("' . $fn . '"))</script>';
+			echo '<script>(function(e){if(e)e.value="js";})(document.getElementById("' . $fn . '"));</script>';
 		}
 
 	}
 
 	public function preprocess_comment($data) {
-		$data['spam_score'] = 0;
-
 		$type = $data['comment_type'];
 		$cid = isset($_POST['NS_CID']) ? $_POST['NS_CID'] : 0;
 		$fn = isset($_SESSION['NS_' . $cid]) ? $_SESSION['NS_' . $cid] : '';
@@ -167,12 +169,12 @@ class OneOfOneNoSpam {
 			'number-of-urls' => ($nurls > $this->options['max_urls']) ? $nurls : 0,
 			'referer' => isset($_SERVER['HTTP_REFERER']) && strpos($_SERVER['HTTP_REFERER'],
 					get_site_url()) !== false ? 0 : 1,
-			'too-fast' => $time < $this->options['min_time'] ? $time : 0
+			'too-fast' => $time < $this->options['min_time'] ? $time : 0,
+			'javascript' => 0
 		);
 
-		if($this->options['javascript'] === 'Y') {
-			$checks['javascript'] = $_POST[$fn] !== 'js' ? 1 : 0;
-			$checks['hidden-field'] = $checks['javascript'];
+		if($this->options['javascript']) {
+			$checks['javascript'] = $checks['hidden-field'] = $_POST[$fn] !== 'js' ? 1 : 0;
 		}
 
 		$score = 0;
@@ -181,30 +183,55 @@ class OneOfOneNoSpam {
 		}
 
 		if($score > 0) {
+			$data['comment_approved'] = 'spam';
+			$checks['spam'] = 1;
 			$data['comment_content'] .= "\n" . json_encode($checks);
-			$data['spam_score'] = $score;
-		} elseif($this->options['debug'] == 'Y') {
+		} elseif($this->options['debug']) {
 			$data['comment_content'] .= "\n<!-- nospam-debug : " . json_encode($checks) . '-->';
 		}
 		return $data;
 	}
 
 	public function pre_comment_approved($approved, $data) {
-		if ($data['spam_score'] > 0) {
-			$this->count++;
-			update_option(self::$OPTION_COUNT, $this->count);
-			if($this->options['auto_delete'] === 'Y') {
-				die('spam');
-			} else {
-				return 'spam';
-
+		$approved = $approved === 'spam' ? $approved : $data['comment_approved'];
+		if ($approved === 'spam') {
+			$this->update_spam_counter();
+			if($this->options['auto_delete']) {
+				add_action('wp_insert_comment', array(&$this, 'handle_auto_delete'), 0, 2);
 			}
 		}
 		return $approved;
 	}
 
-	private function reset_options() {
-		delete_option(self::$OPTION_GROUP);
+	public function handle_auto_delete($id, $comment) {
+		if(!$comment && !is_object($cmt = get_comment($comment))){
+			return;
+		}
+		//$comment->comment_content .=  print_r(array(strpos($comment->comment_content, '"spam":1'), $comment), true);
+		//wp_update_comment((array)$comment);
+		if(strpos($comment->comment_content, '"spam":1') !== false) {
+			wp_delete_comment($id, true);
+		}
+	}
+
+	public function filter_comments_array($comments = array()) {
+		$ret = array();
+		foreach($comments as $k => $v) {
+			if(strpos($v->comment_content, '"spam":1') === FALSE) {
+				$ret[] = $v;
+			}
+		}
+		return $ret;
+	}
+	private function update_spam_counter($i = 1) {
+		global $wpdb;
+		$wpdb->query(
+			$wpdb->prepare(
+				'UPDATE ' . $wpdb->options . ' SET option_value = option_value + %d WHERE option_name = %s;',
+				$i, self::$OPTION_COUNT
+			)
+		);
+
 	}
 
 	private function get_input_option($name, $size = 2, $type = 'text') {

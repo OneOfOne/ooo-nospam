@@ -13,6 +13,8 @@ Extremely simple, 0 configuration and 0 user/admin-interaction anti-spam plugin.
 
 This plugin plugin blocks spam in comments automatically, without requiring any end-user input or any javascript.
 
+* As of version 0.7.7 there's an option to add an extra javascript check, it's off by default.
+
 In a way it's similar to webvitaly's [Anti-Spam](http://wordpress.org/plugins/anti-spam/) however this doesn't
 require the user to enter anything at all.
 
@@ -61,6 +63,10 @@ Feel free to fork it and submit patches / fixes on [github](https://github.com/O
 As of version 0.6 you can access all configurable options in `/wp-admin/options-general.php?page=ooo-nospam-admin`
 
 == Changelog ==
+= v0.8 =
+* Redid the auto-deleting logic, it shouldn't leave any traces of the comment in the database anymore.
+* Added a comments_array filter so none of the spam comments pass to other plugins.
+
 = v0.7.7 =
 * Added an option to use an extra check using javascript.
 * Added a debug option to embed the score array in comments that passes the plugin.
